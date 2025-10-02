@@ -8,12 +8,12 @@
 <style>
   :root { --bg:#0b0c10; --card:#111317; --text:#e8e8e8; --muted:#a1a1aa; --accent:#60a5fa; --line:#1f2430; }
   body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  .wrap { max-width: 960px; margin: 24px auto; padding: 16px; }
+  .wrap { max-width: 1100px; margin: 24px auto; padding: 16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
   h1 { font-size:22px; margin:0 0 12px; }
   p.muted { color:var(--muted); margin:0 0 16px; }
   label { display:block; font-weight:600; margin:12px 0 6px; }
-  select, textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
+  select, input[type="date"], textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
   textarea { min-height:88px; resize:vertical; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
   .actions { display:flex; gap:10px; margin-top:16px; }
@@ -26,28 +26,28 @@
   .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
   .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
   .warn { color:#f59e0b; font-size:12px; margin-top:6px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1 1 240px; }
 
   @media (max-width: 600px) {
     h1 { font-size: 18px; }
     body { font-size: 14px; }
     .wrap { padding: 8px; }
     .card { padding: 12px; }
-    select, textarea { font-size: 14px; padding: 8px; }
+    select, textarea, input[type="date"] { font-size: 14px; padding: 8px; }
     button { flex: 1; font-size: 14px; padding: 8px; }
     .actions { flex-direction: column; }
     table { font-size: 13px; }
-  }
-  @media (max-width: 900px) {
-    h1 { font-size: 20px; }
-    .wrap { padding: 12px; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- Top Nav -->
   <div class="card" style="margin-bottom:12px; padding:12px 16px; display:flex; gap:8px; align-items:center;">
     <button id="navLog" class="secondary">Log</button>
     <button id="navDash" class="secondary">Dashboard</button>
+    <button id="navTrends" class="secondary">Trends</button>
     <span class="pill" id="status" style="margin-left:auto;">Ready</span>
   </div>
 
@@ -72,7 +72,6 @@
           </select>
         </div>
 
-        <!-- Class (now populated from sheet / fallbacks) -->
         <div>
           <label for="class">Class</label>
           <select id="class" name="entry.740434656" required>
@@ -124,11 +123,16 @@
     <h1>Dashboard</h1>
     <p class="muted">Colors: green ≥ 2.5, yellow 1.5–2.49, red &lt; 1.5</p>
 
-    <div style="margin-bottom:12px;">
-      <label for="classFilter">Filter by Class:</label>
-      <select id="classFilter">
-        <option value="">All Classes</option>
-      </select>
+    <div style="margin-bottom:12px;" class="row">
+      <div>
+        <label for="classFilter">Filter by Class:</label>
+        <select id="classFilter">
+          <option value="">All Classes</option>
+        </select>
+      </div>
+      <div style="align-self:flex-end;">
+        <button id="refreshBtn" class="secondary">Refresh</button>
+      </div>
     </div>
 
     <div style="overflow:auto;">
@@ -138,26 +142,51 @@
         <tfoot><tr id="tfoot" class="tfoot-bold"></tr></tfoot>
       </table>
     </div>
-    <div class="actions" style="margin-top:16px;">
-      <button id="refreshBtn" class="secondary">Refresh</button>
+  </div>
+
+  <!-- Trends -->
+  <div class="card hidden" id="trendsCard">
+    <h1>Trends</h1>
+    <p class="muted">See per-student scores over time. Background shows red &lt; 1.5, yellow 1.5–2.49, green ≥ 2.5.</p>
+
+    <div class="row" style="margin-bottom:12px;">
+      <div>
+        <label for="trendClass">Class</label>
+        <select id="trendClass"><option value="">All Classes</option></select>
+      </div>
+      <div>
+        <label for="trendStudent">Student</label>
+        <select id="trendStudent"><option value="">Choose a student</option></select>
+      </div>
+      <div>
+        <label for="dateFrom">From</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div>
+        <label for="dateTo">To</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div style="align-self:flex-end;">
+        <button id="trendRefresh" class="secondary">Update</button>
+      </div>
+    </div>
+
+    <div style="background:#0f1217;border:1px solid var(--line);border-radius:12px;padding:8px;">
+      <canvas id="trendChart" height="110"></canvas>
     </div>
   </div>
 </div>
 
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // === DATA ENDPOINTS ===
-  // Preferred (GViz)
+  // ==== DATA ENDPOINTS ====
   const SHEET_ID = "1mTF8cLllg818vc9A8qJ51UqHucreV1ZQl6OYK9tdkP0";
-  const RESPONSES_GID = "825728935";  // Form Responses tab
-  const CLASSES_SHEET = "Classes";    // Optional tab with a single column "Class"
-
+  const RESPONSES_GID = "825728935";
   const GVIZ_RESPONSES = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${RESPONSES_GID}`;
-  const GVIZ_CLASSES   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CLASSES_SHEET)}`;
+  const PUB_RESPONSES  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
 
-  // Fallback (Publish-to-web CSV)
-  const PUB_RESPONSES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
-
-  // Final fallback: your five classes (never blank)
+  // FALLBACK classes if sheet is empty (never blank)
   const DEFAULT_CLASSES = [
     "Post-Apocalyptic Fiction",
     "Dollars & Sense: Real-World Math for Life",
@@ -166,224 +195,362 @@
     "Wild Wellness: Foraging & Survival Shelter Building"
   ];
 
-  async function fetchCSV(urls) {
-    let lastErr = null;
-    for (const u of urls) {
-      try {
-        const res = await fetch(u, { cache: 'no-store', mode: 'cors' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        if (!text.trim()) throw new Error('Empty CSV');
-        return text;
-      } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('All sources failed');
-  }
-
-  function parseCSV(csv) {
-    return csv
-      .split(/\r?\n/)
-      .filter(r => r.trim().length)
-      .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
-  }
-
-  function findHeader(headers, names) {
-    const norm = s => (s||'').toString().trim().toLowerCase();
-    const H = headers.map(norm);
-    for (const name of names) {
-      const i = H.indexOf(norm(name));
-      if (i !== -1) return i;
-    }
-    return -1;
-  }
-
-  function requireIndex(idx, label) {
-    if (idx === -1) throw new Error('Missing column: ' + label);
-  }
-
-  function distinctSortedTrimmed(values) {
-    const seen = new Map();
-    for (const v of values) {
-      const t = (v || '').trim();
-      if (!t) continue;
-      const k = t.toLowerCase();
-      if (!seen.has(k)) seen.set(k, t);
-    }
-    return [...seen.values()].sort((a,b)=>a.localeCompare(b));
-  }
-
-  // === CLASS LIST POPULATION ===
-  const classSelect = document.getElementById('class');
-  const classFilter = document.getElementById('classFilter');
-  const classWarn = document.getElementById('classWarn');
-
-  async function getClasses() {
-    // 1) Try dedicated "Classes" tab
-    try {
-      const csv = await fetchCSV([GVIZ_CLASSES]);
-      const rows = parseCSV(csv);
-      const head = rows[0];
-      const iClass = findHeader(head, ['Class']);
-      requireIndex(iClass, 'Class');
-      const list = distinctSortedTrimmed(rows.slice(1).map(r => r[iClass]));
-      if (list.length) return list;
-    } catch(_) { /* ignore and fall through */ }
-
-    // 2) Fall back to responses sheet
-    try {
-      const csv = await fetchCSV([GVIZ_RESPONSES, PUB_RESPONSES]);
-      const rows = parseCSV(csv);
-      const head = rows[0];
-      const iClass = findHeader(head, ['Class']);
-      requireIndex(iClass, 'Class');
-      const list = distinctSortedTrimmed(rows.slice(1).map(r => r[iClass]));
-      if (list.length) return list;
-    } catch(_) { /* ignore and fall through */ }
-
-    // 3) Final fallback
-    return DEFAULT_CLASSES.slice();
-  }
-
-  async function populateClassControls() {
-    const classes = await getClasses();
-    const currentFormSel = classSelect.value;
-    const currentFilterSel = classFilter.value;
-
-    classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
-    classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
-
-    if (classes.includes(currentFormSel)) classSelect.value = currentFormSel;
-    if (currentFilterSel && classes.includes(currentFilterSel)) classFilter.value = currentFilterSel;
-
-    classWarn.classList.toggle('hidden', classes !== DEFAULT_CLASSES);
-  }
-
-  // === DASHBOARD ===
+  // ==== UTILS ====
   const statusPill = document.getElementById('status');
-  const thead = document.getElementById('thead');
-  const tbody = document.getElementById('tbody');
-  const tfoot = document.getElementById('tfoot');
-
-  function tint(v) {
-    if (v === null) return '';
-    if (v < 1.5) return 'background:#2b0b0b; color:#ef4444;';
-    if (v < 2.5) return 'background:#3a2500; color:#f59e0b;';
-    return 'background:#052814; color:#22c55e;';
+  function parseCSV(csv){
+    return csv.split(/\r?\n/).filter(r=>r.trim().length).map(r=>r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
   }
+  function findHeader(headers, names) {
+    const norm=s=>(s||'').toString().trim().toLowerCase(); const H=headers.map(norm);
+    for (const n of names){ const i=H.indexOf(norm(n)); if(i!==-1) return i; } return -1;
+  }
+  function requireIndex(idx,label){ if(idx===-1) throw new Error('Missing column: '+label); }
+  function distinctSortedTrimmed(values){ const m=new Map(); for(const v of values){const t=(v||'').trim(); if(!t) continue; const k=t.toLowerCase(); if(!m.has(k)) m.set(k,t);} return [...m.values()].sort((a,b)=>a.localeCompare(b)); }
+  function tint(v){ if(v===null) return ''; if(v<1.5) return 'background:#2b0b0b; color:#ef4444;'; if(v<2.5) return 'background:#3a2500; color:#f59e0b;'; return 'background:#052814; color:#22c55e;'; }
 
-  async function loadDashboard() {
-    try {
-      statusPill.textContent = 'Loading…';
-      await populateClassControls();
-
-      const csv = await fetchCSV([GVIZ_RESPONSES, PUB_RESPONSES]);
-      const rows = parseCSV(csv);
-      if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
-
-      const head = rows[0];
-      const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
-
-      const iStudent = findHeader(head, ['Student','Student Name']);
-      const iClass = findHeader(head, ['Class']);
-      requireIndex(iStudent, 'Student'); requireIndex(iClass, 'Class');
-
-      const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
-      const catAliases = {
-        'Preparedness': ['Preparedness'],
-        'Participation': ['Participation'],
-        'Work Completion': ['Work Completion','Work completion'],
-        'Collaboration': ['Collaboration'],
-        'Reflection/Growth': ['Reflection/Growth','Reflection / Growth','Reflection- Growth'],
-      };
-      const iCats = cats.map(c => findHeader(head, catAliases[c]));
-      iCats.forEach((idx,k)=>requireIndex(idx,cats[k]));
-
-      // Filter by class
-      const sel = classFilter.value;
-      const filtered = sel ? data.filter(r => (r[iClass]||'').trim() === sel) : data;
-
-      // Aggregate
-      const byStudent = new Map();
-      const sums = Array(iCats.length).fill(0);
-      const counts = Array(iCats.length).fill(0);
-
-      for (const r of filtered) {
-        const name = (r[iStudent]||'').trim();
-        if (!name) continue;
-        if (!byStudent.has(name)) byStudent.set(name, { s:Array(iCats.length).fill(0), c:Array(iCats.length).fill(0) });
-        const rec = byStudent.get(name);
-        iCats.forEach((col,i)=>{
-          const v = Number((r[col]||'').toString().trim());
-          if (!Number.isNaN(v)) { rec.s[i]+=v; rec.c[i]++; sums[i]+=v; counts[i]++; }
-        });
-      }
-
-      const rowsOut = [...byStudent.entries()].map(([student,rec])=>{
-        const avgs = rec.s.map((s,i)=> rec.c[i] ? s/rec.c[i] : null);
-        const used = avgs.filter(x=>x!==null);
-        const overall = used.length ? used.reduce((a,b)=>a+b,0)/used.length : null;
-        return { student, avgs, overall };
-      }).sort((a,b)=> (a.overall ?? Infinity) - (b.overall ?? Infinity));
-
-      const classAvgs = sums.map((s,i)=> counts[i] ? s/counts[i] : null);
-      const usedC = classAvgs.filter(x=>x!==null);
-      const classOverall = usedC.length ? usedC.reduce((a,b)=>a+b,0)/usedC.length : null;
-
-      // Render
-      thead.innerHTML=''; tbody.innerHTML=''; tfoot.innerHTML='';
-      ['Student',...cats,'Overall'].forEach(h=>{ const th=document.createElement('th'); th.textContent=h; thead.appendChild(th); });
-
-      rowsOut.forEach(r=>{
-        const tr=document.createElement('tr');
-        function td(t,style=''){ const c=document.createElement('td'); c.textContent=t; if(style) c.style=style; tr.appendChild(c);}
-        td(r.student);
-        r.avgs.forEach(v=>td(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
-        td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2),'font-weight:700; '+tint(r.overall));
-        tbody.appendChild(tr);
-      });
-
-      const trF=document.createElement('tr');
-      function tdf(t,style=''){ const c=document.createElement('td'); c.textContent=t; if(style) c.style=style; trF.appendChild(c); }
-      const label = sel ? `Class Average (${sel})` : 'Class Average (All)';
-      tdf(label);
-      classAvgs.forEach(v=>tdf(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
-      tdf(classOverall==null?'—':(Math.round(classOverall*100)/100).toFixed(2),'font-weight:700; '+tint(classOverall));
-      tfoot.appendChild(trF);
-
-      statusPill.textContent='Ready';
-    } catch(e) {
-      console.error(e);
-      statusPill.textContent='Error';
-      alert('Dashboard error: ' + (e.message || e));
+  async function fetchCSV() {
+    for (const url of [GVIZ_RESPONSES, PUB_RESPONSES]) {
+      try {
+        const res = await fetch(url, { cache:'no-store', mode:'cors' }); if(!res.ok) throw 0;
+        const txt = await res.text(); if(!txt.trim()) throw 0;
+        return txt;
+      } catch(e) {}
     }
+    throw new Error('Could not load data');
   }
 
-  // === UI WIRING ===
-  const navLog = document.getElementById('navLog');
-  const navDash = document.getElementById('navDash');
-  const logCard = document.getElementById('logCard');
-  const dashCard = document.getElementById('dashCard');
+  // ==== GLOBAL STATE (derived from sheet) ====
+  let SHEET_ROWS = [];   // raw array rows (including header)
+  let HEAD = [];        // header row
+  let IDX = {};         // column indexes
+  let DATA = [];        // data rows (no header)
+
+  const CATS = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
+  const CAT_ALIASES = {
+    'Preparedness':['Preparedness'],
+    'Participation':['Participation'],
+    'Work Completion':['Work Completion','Work completion'],
+    'Collaboration':['Collaboration'],
+    'Reflection/Growth':['Reflection/Growth','Reflection / Growth','Reflection- Growth'],
+  };
+
+  async function loadSheet() {
+    statusPill.textContent='Loading…';
+    const csv = await fetchCSV();
+    SHEET_ROWS = parseCSV(csv);
+    if (SHEET_ROWS.length<2) throw new Error('No data');
+    HEAD = SHEET_ROWS[0];
+    DATA = SHEET_ROWS.slice(1).filter(r => r.some(c => (c||'').trim()!==''));
+
+    IDX.timestamp = findHeader(HEAD, ['Timestamp','Date','Time']);
+    IDX.student   = findHeader(HEAD, ['Student','Student Name']);
+    IDX.class     = findHeader(HEAD, ['Class']);
+    requireIndex(IDX.student,'Student'); requireIndex(IDX.class,'Class'); // timestamp optional
+
+    IDX.cats = CATS.map(c => findHeader(HEAD, CAT_ALIASES[c]));
+    IDX.cats.forEach((i,k)=>requireIndex(i,CATS[k]));
+
+    statusPill.textContent='Ready';
+  }
+
+  // ==== CLASS SOURCING ====
+  const classSelect = document.getElementById('class');
+  const classWarn   = document.getElementById('classWarn');
+  const classFilter = document.getElementById('classFilter');
+  const trendClass  = document.getElementById('trendClass');
+
+  function populateClasses() {
+    const fromData = distinctSortedTrimmed(DATA.map(r => r[IDX.class]));
+    const classes = fromData.length ? fromData : DEFAULT_CLASSES;
+    const mk = (arr, first) => first + arr.map(c=>`<option>${c}</option>`).join('');
+    classSelect.innerHTML = mk(classes, '<option value="" selected>—</option>');
+    classFilter.innerHTML = mk(classes, '<option value="">All Classes</option>');
+    trendClass.innerHTML  = mk(classes, '<option value="">All Classes</option>');
+    classWarn.classList.toggle('hidden', fromData.length>0);
+  }
+
+  // ==== LOG FORM WIRING ====
   const confirmEl = document.getElementById('confirm');
   const form = document.getElementById('gform');
   const clearBtn = document.getElementById('clearBtn');
-  const refreshBtn = document.getElementById('refreshBtn');
-
   form.addEventListener('submit', () => {
-    statusPill.textContent = 'Submitting…'; confirmEl.classList.add('hidden');
-    const iframe = document.getElementById('hidden_iframe');
-    const onLoad = () => { statusPill.textContent = 'Submitted'; confirmEl.classList.remove('hidden'); iframe.removeEventListener('load', onLoad); form.reset(); populateClassControls().catch(()=>{}); };
+    statusPill.textContent='Submitting…'; confirmEl.classList.add('hidden');
+    const iframe=document.getElementById('hidden_iframe');
+    const onLoad=()=>{ statusPill.textContent='Submitted'; confirmEl.classList.remove('hidden'); iframe.removeEventListener('load',onLoad); form.reset(); };
     iframe.addEventListener('load', onLoad);
   });
+  clearBtn.addEventListener('click', ()=>{ form.reset(); confirmEl.classList.add('hidden'); statusPill.textContent='Ready'; });
 
-  clearBtn.addEventListener('click', () => { form.reset(); confirmEl.classList.add('hidden'); statusPill.textContent = 'Ready'; populateClassControls().catch(()=>{}); });
+  // ==== DASHBOARD (table + class average) ====
+  const navLog = document.getElementById('navLog');
+  const navDash= document.getElementById('navDash');
+  const navTrends = document.getElementById('navTrends');
+  const logCard = document.getElementById('logCard');
+  const dashCard= document.getElementById('dashCard');
+  const trendsCard = document.getElementById('trendsCard');
 
-  navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
-  navDash.addEventListener('click', () => { logCard.classList.add('hidden'); dashCard.classList.remove('hidden'); loadDashboard(); });
-  refreshBtn.addEventListener('click', loadDashboard);
-  classFilter.addEventListener('change', loadDashboard);
+  const thead = document.getElementById('thead');
+  const tbody = document.getElementById('tbody');
+  const tfoot = document.getElementById('tfoot');
+  const refreshBtn = document.getElementById('refreshBtn');
 
-  // Prime class dropdowns on page load
-  (async () => { await populateClassControls(); })();
+  function renderDashboard() {
+    const sel = classFilter.value;
+    const rows = sel ? DATA.filter(r => (r[IDX.class]||'').trim()===sel) : DATA;
+
+    const byStudent = new Map();
+    const sums = Array(IDX.cats.length).fill(0);
+    const counts = Array(IDX.cats.length).fill(0);
+
+    for (const r of rows) {
+      const name = (r[IDX.student]||'').trim(); if(!name) continue;
+      if(!byStudent.has(name)) byStudent.set(name,{s:Array(IDX.cats.length).fill(0), c:Array(IDX.cats.length).fill(0)});
+      const rec = byStudent.get(name);
+      IDX.cats.forEach((col,i)=>{ const v=Number((r[col]||'').toString().trim()); if(!Number.isNaN(v)){ rec.s[i]+=v; rec.c[i]++; sums[i]+=v; counts[i]++; } });
+    }
+
+    const agg=[...byStudent.entries()].map(([student,rec])=>{
+      const avgs = rec.s.map((s,i)=> rec.c[i] ? s/rec.c[i] : null);
+      const used = avgs.filter(x=>x!==null);
+      const overall = used.length ? used.reduce((a,b)=>a+b,0)/used.length : null;
+      return { student, avgs, overall };
+    }).sort((a,b)=>(a.overall??Infinity)-(b.overall??Infinity));
+
+    // paint
+    thead.innerHTML=''; tbody.innerHTML=''; tfoot.innerHTML='';
+    ['Student',...CATS,'Overall'].forEach(h=>{ const th=document.createElement('th'); th.textContent=h; thead.appendChild(th); });
+
+    agg.forEach(r=>{
+      const tr=document.createElement('tr');
+      function td(txt, style=''){ const c=document.createElement('td'); c.textContent=txt; if(style) c.style=style; tr.appendChild(c); }
+      td(r.student);
+      r.avgs.forEach(v=>td(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
+      td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2),'font-weight:700; '+tint(r.overall));
+      tbody.appendChild(tr);
+    });
+
+    const classAvgs = sums.map((s,i)=> counts[i]?s/counts[i]:null);
+    const usedC = classAvgs.filter(x=>x!==null);
+    const classOverall = usedC.length ? usedC.reduce((a,b)=>a+b,0)/usedC.length : null;
+
+    const trF=document.createElement('tr');
+    function tdf(txt, style=''){ const c=document.createElement('td'); c.textContent=txt; if(style) c.style=style; trF.appendChild(c); }
+    const label = sel ? `Class Average (${sel})` : 'Class Average (All)';
+    tdf(label);
+    classAvgs.forEach(v=>tdf(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
+    tdf(classOverall==null?'—':(Math.round(classOverall*100)/100).toFixed(2),'font-weight:700; '+tint(classOverall));
+    tfoot.appendChild(trF);
+  }
+
+  async function showDashboard() {
+    logCard.classList.add('hidden'); trendsCard.classList.add('hidden'); dashCard.classList.remove('hidden');
+    await ensureDataLoaded();
+    populateClasses();
+    renderDashboard();
+  }
+
+  // ==== TRENDS (Chart.js) ====
+  const trendClassSel = document.getElementById('trendClass');
+  const trendStudent  = document.getElementById('trendStudent');
+  const dateFrom = document.getElementById('dateFrom');
+  const dateTo   = document.getElementById('dateTo');
+  const trendRefresh = document.getElementById('trendRefresh');
+  let trendChart;
+
+  function getStudentsForClass(cls) {
+    const set = new Set();
+    const rows = cls ? DATA.filter(r => (r[IDX.class]||'').trim()===cls) : DATA;
+    rows.forEach(r => { const name=(r[IDX.student]||'').trim(); if(name) set.add(name); });
+    return [...set].sort((a,b)=>a.localeCompare(b));
+  }
+
+  function rebuildStudentList() {
+    const cls = trendClassSel.value;
+    const students = getStudentsForClass(cls);
+    const prev = trendStudent.value;
+    trendStudent.innerHTML = '<option value="">Choose a student</option>' + students.map(s=>`<option>${s}</option>`).join('');
+    if (students.includes(prev)) trendStudent.value = prev;
+  }
+
+  function buildTrendSeries(cls, student, from, to) {
+    const rows = DATA.filter(r=>{
+      if (cls && (r[IDX.class]||'').trim()!==cls) return false;
+      if (student && (r[IDX.student]||'').trim()!==student) return false;
+      return true;
+    });
+
+    // map: [{t: Date, catScores[], overall}]
+    const points=[];
+    for (const r of rows) {
+      let t = null;
+      if (IDX.timestamp !== -1) {
+        const raw = r[IDX.timestamp];
+        // Let Date parse common formats; if it fails, t stays null
+        const d = new Date(raw);
+        if (!isNaN(+d)) t = d;
+      }
+      // If no timestamp column, use row index as pseudo-time
+      if (!t) t = new Date(0); // epoch; will sort but all same
+      const catVals = IDX.cats.map(col=>{
+        const v = Number((r[col]||'').toString().trim());
+        return Number.isNaN(v)? null : v;
+      });
+      const used = catVals.filter(v=>v!==null);
+      const overall = used.length ? used.reduce((a,b)=>a+b,0)/used.length : null;
+      points.push({ t, cats: catVals, overall });
+    }
+
+    // sort by time
+    points.sort((a,b)=> a.t - b.t);
+
+    // date filtering
+    const fromD = from ? new Date(from) : null;
+    const toD   = to ? new Date(to)   : null;
+    const filtered = points.filter(p=>{
+      if (fromD && p.t < fromD) return false;
+      if (toD && p.t > new Date(toD.getTime()+24*3600*1000-1)) return false; // inclusive
+      return true;
+    });
+
+    return filtered;
+  }
+
+  function renderTrendChart(series) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+
+    // Build datasets
+    const labels = series.map(p => (IDX.timestamp!==-1 ? p.t : null));
+    const dataByCat = IDX.cats.map((_,i)=> series.map(p => p.cats[i]));
+    const overall = series.map(p => p.overall);
+
+    // background bands plugin
+    const zonePlugin = {
+      id: 'zones',
+      beforeDraw(chart,args,opts){
+        const {ctx, chartArea:{top,bottom,left,right}, scales:{y}} = chart;
+        const yRedTop = y.getPixelForValue(1.5);
+        const yYellowTop = y.getPixelForValue(2.5);
+        ctx.save();
+        // Red
+        ctx.fillStyle = 'rgba(239,68,68,0.10)';
+        ctx.fillRect(left, y.getPixelForValue(0), right-left, yRedTop - y.getPixelForValue(0));
+        // Yellow
+        ctx.fillStyle = 'rgba(245,158,11,0.10)';
+        ctx.fillRect(left, yRedTop, right-left, yYellowTop - yRedTop);
+        // Green
+        ctx.fillStyle = 'rgba(34,197,94,0.10)';
+        ctx.fillRect(left, yYellowTop, right-left, bottom - yYellowTop);
+        ctx.restore();
+      }
+    };
+
+    const catColors = [
+      '#60a5fa', // Preparedness
+      '#a78bfa', // Participation
+      '#f472b6', // Work Completion
+      '#f59e0b', // Collaboration
+      '#22c55e', // Reflection/Growth
+    ];
+    const datasets = CATS.map((cat, i)=>({
+      label: cat,
+      data: dataByCat[i],
+      tension: 0.25,
+      spanGaps: true,
+      borderColor: catColors[i],
+      pointBackgroundColor: catColors[i],
+      borderWidth: 2,
+      pointRadius: 3
+    }));
+    datasets.push({
+      label: 'Overall',
+      data: overall,
+      tension: 0.25,
+      spanGaps: true,
+      borderColor: '#e5e7eb',
+      pointBackgroundColor: '#e5e7eb',
+      borderDash: [6,4],
+      borderWidth: 2,
+      pointRadius: 3
+    });
+
+    if (trendChart) { trendChart.destroy(); }
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      plugins:[zonePlugin],
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        interaction:{ mode:'nearest', intersect:false },
+        scales:{
+          x:{
+            type: (IDX.timestamp!==-1 ? 'time' : 'category'),
+            time: { unit:'day' },
+            grid:{ color:'rgba(255,255,255,0.06)' },
+            ticks:{ color:'#cbd5e1' }
+          },
+          y:{
+            min:0, max:3, ticks:{ stepSize:0.5, color:'#cbd5e1' },
+            grid:{ color:'rgba(255,255,255,0.06)' }
+          }
+        },
+        plugins:{
+          legend:{ labels:{ color:'#e5e7eb' } },
+          tooltip:{
+            callbacks:{
+              label: (ctx)=>{
+                const v = ctx.raw;
+                const s = (v==null? '—' : (Math.round(v*100)/100).toFixed(2));
+                return `${ctx.dataset.label}: ${s}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function updateTrendUI() {
+    rebuildStudentList();
+    const cls = trendClassSel.value;
+    const student = trendStudent.value;
+    const from = dateFrom.value;
+    const to = dateTo.value;
+    const series = buildTrendSeries(cls, student || null, from || null, to || null);
+    renderTrendChart(series);
+  }
+
+  async function showTrends() {
+    logCard.classList.add('hidden'); dashCard.classList.add('hidden'); trendsCard.classList.remove('hidden');
+    await ensureDataLoaded();
+    populateClasses();       // keeps class lists in sync
+    rebuildStudentList();    // students per class
+    updateTrendUI();
+  }
+
+  // ==== NAV ====
+  navLog.addEventListener('click', ()=>{ dashCard.classList.add('hidden'); trendsCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
+  navDash.addEventListener('click', showDashboard);
+  navTrends.addEventListener('click', showTrends);
+  refreshBtn.addEventListener('click', showDashboard);
+  classFilter.addEventListener('change', renderDashboard);
+
+  trendClassSel.addEventListener('change', ()=>{ rebuildStudentList(); updateTrendUI(); });
+  trendStudent.addEventListener('change', updateTrendUI);
+  dateFrom.addEventListener('change', updateTrendUI);
+  dateTo.addEventListener('change', updateTrendUI);
+  document.getElementById('trendRefresh').addEventListener('click', updateTrendUI);
+
+  // ==== BOOT ====
+  let _loaded = false;
+  async function ensureDataLoaded(){
+    if (_loaded) return;
+    await loadSheet();
+    populateClasses();
+    _loaded = true;
+  }
+  // Optional: pre-load data so first click is instant
+  ensureDataLoaded().catch(()=>{});
 </script>
 </body>
 </html>
