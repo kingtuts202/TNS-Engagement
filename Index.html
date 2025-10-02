@@ -13,8 +13,7 @@
   h1 { font-size:22px; margin:0 0 12px; }
   p.muted { color:var(--muted); margin:0 0 16px; }
   label { display:block; font-weight:600; margin:12px 0 6px; }
-  select, textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
-  textarea { min-height:88px; resize:vertical; }
+  select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
   .actions { display:flex; gap:10px; margin-top:16px; }
   button { cursor:pointer; border:1px solid var(--line); background:var(--accent); color:#0b1220; font-weight:700; padding:10px 14px; border-radius:12px; }
@@ -40,65 +39,73 @@
     <h1>Engagement Tracker</h1>
     <p class="muted">Use 0–3 where 3 = consistently engaged.</p>
 
-    <!-- Hidden iframe to avoid leaving the page on form submit -->
+    <!-- Hidden iframe to avoid navigating away on submit -->
     <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
 
-    <!-- TODO(1): Replace action with your Google Form formResponse URL -->
+    <!-- Posts directly to your Google Form -->
     <form id="gform" method="POST" target="hidden_iframe"
-      action="https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse">
+      action="https://docs.google.com/forms/d/e/1FAIpQLScQKrGvj614QZdjZBDBMdoPHR2hJT15fNJwBekfvdWUaiX8jA/formResponse">
       <div class="grid">
         <!-- Student -->
         <div>
           <label for="student">Student</label>
-          <!-- TODO(1): Replace entry.111 with your Student field entry id -->
-          <select id="student" name="entry.111" required>
+          <select id="student" name="entry.600087882" required>
             <option value="" selected>—</option>
-            <option>Tony</option><option>Cameron</option><option>Sela</option>
-            <option>Miles</option><option>Juni</option><option>Lucy</option>
-            <option>Kaden</option><option>Quinn</option><option>Micah</option>
-            <option>Lia</option><option>Phoenix</option><option>Uriah</option>
+            <option>Tony</option>
+            <option>Cameron</option>
+            <option>Sela</option>
+            <option>Miles</option>
+            <option>Juni</option>
+            <option>Lucy</option>
+            <option>Kaden</option>
+            <option>Quinn</option>
+            <option>Micah</option>
+            <option>Lia</option>
+            <option>Phoenix</option>
+            <option>Uriah</option>
           </select>
         </div>
 
         <!-- Preparedness -->
         <div>
           <label>Preparedness (0–3)</label>
-          <!-- TODO(1): Replace entry.222 with Preparedness entry id -->
-          <select name="entry.222"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          <select name="entry.1686702304">
+            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
+          </select>
         </div>
 
         <!-- Participation -->
         <div>
           <label>Participation (0–3)</label>
-          <!-- TODO(1): Replace entry.333 with Participation entry id -->
-          <select name="entry.333"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          <select name="entry.1636498973">
+            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
+          </select>
         </div>
 
         <!-- Work Completion -->
         <div>
           <label>Work Completion (0–3)</label>
-          <!-- TODO(1): Replace entry.444 with Work Completion entry id -->
-          <select name="entry.444"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          <select name="entry.1072802712">
+            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
+          </select>
         </div>
 
         <!-- Collaboration -->
         <div>
           <label>Collaboration (0–3)</label>
-          <!-- TODO(1): Replace entry.555 with Collaboration entry id -->
-          <select name="entry.555"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          <select name="entry.1339133543">
+            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
+          </select>
         </div>
 
         <!-- Reflection/Growth -->
         <div>
           <label>Reflection/Growth (0–3)</label>
-          <!-- TODO(1): Replace entry.666 with Reflection/Growth entry id -->
-          <select name="entry.666"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          <select name="entry.476397369">
+            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
+          </select>
         </div>
       </div>
-
-      <label for="notes" style="margin-top:12px;">Notes (optional)</label>
-      <!-- TODO(1): Replace entry.777 with Notes entry id -->
-      <textarea id="notes" name="entry.777" placeholder="E.g., led the discussion; needs reminder on materials"></textarea>
 
       <div class="actions">
         <button type="submit">Submit</button>
@@ -128,9 +135,8 @@
 </div>
 
 <script>
-  // TODO(2): Replace with your Published CSV URL (Form Responses sheet)
-  // Example: const CSV_URL = "https://docs.google.com/spreadsheets/d/XYZ/pub?output=csv";
-  const CSV_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/pub?output=csv";
+  // Your published CSV (dashboard data)
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
 
   const navLog = document.getElementById('navLog');
   const navDash = document.getElementById('navDash');
@@ -140,17 +146,19 @@
   const confirmEl = document.getElementById('confirm');
   const form = document.getElementById('gform');
   const clearBtn = document.getElementById('clearBtn');
+  const thead = document.getElementById('thead');
+  const tbody = document.getElementById('tbody');
 
   // Submit to Google Form in a hidden iframe (avoids CORS, keeps page on GitHub)
   form.addEventListener('submit', () => {
     statusPill.textContent = 'Submitting…';
     confirmEl.classList.add('hidden');
-    // The iframe will load after Google receives the response; show confirmation then.
     const iframe = document.getElementById('hidden_iframe');
     const onLoad = () => {
       statusPill.textContent = 'Submitted';
       confirmEl.classList.remove('hidden');
       iframe.removeEventListener('load', onLoad);
+      form.reset();
     };
     iframe.addEventListener('load', onLoad);
   });
@@ -172,60 +180,57 @@
   }
 
   async function loadDashboard() {
-    statusPill.textContent = 'Loading…';
-    const res = await fetch(CSV_URL);
-    const csv = await res.text();
-    // Simple CSV parse
-    const rows = csv.split(/\r?\n/).map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
-    if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
+    try {
+      statusPill.textContent = 'Loading…';
+      const res = await fetch(CSV_URL, { cache: 'no-store' });
+      const csv = await res.text();
+      const rows = csv.split(/\r?\n/).map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+      if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
 
-    const head = rows[0];
-    const data = rows.slice(1).filter(r => r.length === head.length);
+      const head = rows[0];
+      const data = rows.slice(1).filter(r => r.length === head.length && r.some(c => c.trim() !== ''));
 
-    // Column indexes
-    const iStudent = head.indexOf('Student');
-    const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
-    const iCats = cats.map(c => head.indexOf(c));
+      const iStudent = head.indexOf('Student');
+      const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
+      const iCats = cats.map(c => head.indexOf(c));
 
-    // Group by student
-    const map = new Map();
-    for (const r of data) {
-      const name = r[iStudent];
-      if (!name) continue;
-      if (!map.has(name)) map.set(name, { sums:Array(5).fill(0), counts:Array(5).fill(0) });
-      const rec = map.get(name);
-      iCats.forEach((idx, i) => {
-        const v = Number(r[idx]);
-        if (!isNaN(v)) { rec.sums[i] += v; rec.counts[i] += 1; }
+      const map = new Map();
+      for (const r of data) {
+        const name = r[iStudent];
+        if (!name) continue;
+        if (!map.has(name)) map.set(name, { sums:Array(cats.length).fill(0), counts:Array(cats.length).fill(0) });
+        const rec = map.get(name);
+        iCats.forEach((idx, i) => {
+          const v = Number(r[idx]);
+          if (!isNaN(v)) { rec.sums[i] += v; rec.counts[i] += 1; }
+        });
+      }
+
+      const agg = [...map.entries()].map(([student, rec]) => {
+        const avgs = rec.sums.map((s, i) => rec.counts[i] ? s/rec.counts[i] : null);
+        const nums = avgs.filter(x => x !== null);
+        const overall = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
+        return { student, avgs, overall };
+      }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
+
+      thead.innerHTML = ''; tbody.innerHTML = '';
+      ['Student', ...cats, 'Overall'].forEach(h => {
+        const th = document.createElement('th'); th.textContent = h; thead.appendChild(th);
       });
+      agg.forEach(r => {
+        const tr = document.createElement('tr');
+        function td(txt, style='') { const c=document.createElement('td'); c.textContent=txt; if(style) c.style=style; tr.appendChild(c); }
+        td(r.student);
+        r.avgs.forEach(v => td(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
+        td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2), 'font-weight:700; ' + tint(r.overall));
+        tbody.appendChild(tr);
+      });
+
+      statusPill.textContent = 'Ready';
+    } catch (e) {
+      statusPill.textContent = 'Error';
+      alert('Dashboard error: ' + (e.message || e));
     }
-
-    const rowsAgg = [...map.entries()].map(([student, rec]) => {
-      const avgs = rec.sums.map((s, i) => rec.counts[i] ? s/rec.counts[i] : null);
-      const nums = avgs.filter(x => x !== null);
-      const overall = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
-      return { student, avgs, overall };
-    }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
-
-    // Render table
-    const thead = document.getElementById('thead');
-    const tbody = document.getElementById('tbody');
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
-
-    const ths = ['Student', ...cats, 'Overall'];
-    ths.forEach(h => { const th = document.createElement('th'); th.textContent = h; thead.appendChild(th); });
-
-    rowsAgg.forEach(r => {
-      const tr = document.createElement('tr');
-      function td(txt, style='') { const td=document.createElement('td'); td.textContent=txt; if(style) td.style=style; tr.appendChild(td); }
-      td(r.student);
-      r.avgs.forEach(v => td(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
-      td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2), 'font-weight:700; ' + tint(r.overall));
-      tbody.appendChild(tr);
-    });
-
-    statusPill.textContent = 'Ready';
   }
 </script>
 </body>
