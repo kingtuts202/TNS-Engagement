@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>TNS Engagement Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#0b0c10; --card:#111317; --text:#e8e8e8; --muted:#a1a1aa; --accent:#60a5fa; --line:#1f2430; }
+  body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width: 860px; margin: 24px auto; padding: 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  h1 { font-size:22px; margin:0 0 12px; }
+  p.muted { color:var(--muted); margin:0 0 16px; }
+  label { display:block; font-weight:600; margin:12px 0 6px; }
+  select, textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
+  textarea { min-height:88px; resize:vertical; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  .actions { display:flex; gap:10px; margin-top:16px; }
+  button { cursor:pointer; border:1px solid var(--line); background:var(--accent); color:#0b1220; font-weight:700; padding:10px 14px; border-radius:12px; }
+  button.secondary { background:transparent; color:var(--text); }
+  .hidden { display:none; }
+  .pill { display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Top Nav -->
+  <div class="card" style="margin-bottom:12px; padding:12px 16px; display:flex; gap:8px; align-items:center;">
+    <button id="navLog" class="secondary">Log</button>
+    <button id="navDash" class="secondary">Dashboard</button>
+    <span class="pill" id="status" style="margin-left:auto;">Ready</span>
+  </div>
+
+  <!-- Log card -->
+  <div class="card" id="logCard">
+    <h1>Engagement Tracker</h1>
+    <p class="muted">Use 0–3 where 3 = consistently engaged.</p>
+
+    <!-- Hidden iframe to avoid leaving the page on form submit -->
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+
+    <!-- TODO(1): Replace action with your Google Form formResponse URL -->
+    <form id="gform" method="POST" target="hidden_iframe"
+      action="https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse">
+      <div class="grid">
+        <!-- Student -->
+        <div>
+          <label for="student">Student</label>
+          <!-- TODO(1): Replace entry.111 with your Student field entry id -->
+          <select id="student" name="entry.111" required>
+            <option value="" selected>—</option>
+            <option>Tony</option><option>Cameron</option><option>Sela</option>
+            <option>Miles</option><option>Juni</option><option>Lucy</option>
+            <option>Kaden</option><option>Quinn</option><option>Micah</option>
+            <option>Lia</option><option>Phoenix</option><option>Uriah</option>
+          </select>
+        </div>
+
+        <!-- Preparedness -->
+        <div>
+          <label>Preparedness (0–3)</label>
+          <!-- TODO(1): Replace entry.222 with Preparedness entry id -->
+          <select name="entry.222"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+
+        <!-- Participation -->
+        <div>
+          <label>Participation (0–3)</label>
+          <!-- TODO(1): Replace entry.333 with Participation entry id -->
+          <select name="entry.333"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+
+        <!-- Work Completion -->
+        <div>
+          <label>Work Completion (0–3)</label>
+          <!-- TODO(1): Replace entry.444 with Work Completion entry id -->
+          <select name="entry.444"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+
+        <!-- Collaboration -->
+        <div>
+          <label>Collaboration (0–3)</label>
+          <!-- TODO(1): Replace entry.555 with Collaboration entry id -->
+          <select name="entry.555"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+
+        <!-- Reflection/Growth -->
+        <div>
+          <label>Reflection/Growth (0–3)</label>
+          <!-- TODO(1): Replace entry.666 with Reflection/Growth entry id -->
+          <select name="entry.666"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+      </div>
+
+      <label for="notes" style="margin-top:12px;">Notes (optional)</label>
+      <!-- TODO(1): Replace entry.777 with Notes entry id -->
+      <textarea id="notes" name="entry.777" placeholder="E.g., led the discussion; needs reminder on materials"></textarea>
+
+      <div class="actions">
+        <button type="submit">Submit</button>
+        <button type="button" class="secondary" id="clearBtn">Clear</button>
+      </div>
+    </form>
+
+    <div id="confirm" class="hidden" style="margin-top:12px;">
+      <span class="badge" style="background:#22c55e; color:#052814;">✅ Logged</span>
+    </div>
+  </div>
+
+  <!-- Dashboard card -->
+  <div class="card hidden" id="dashCard">
+    <h1>Dashboard</h1>
+    <p class="muted">Colors: green ≥ 2.5, yellow 1.5–2.49, red &lt; 1.5</p>
+    <div style="overflow:auto;">
+      <table>
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="actions" style="margin-top:16px;">
+      <button id="refreshBtn" class="secondary">Refresh</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // TODO(2): Replace with your Published CSV URL (Form Responses sheet)
+  // Example: const CSV_URL = "https://docs.google.com/spreadsheets/d/XYZ/pub?output=csv";
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/pub?output=csv";
+
+  const navLog = document.getElementById('navLog');
+  const navDash = document.getElementById('navDash');
+  const logCard = document.getElementById('logCard');
+  const dashCard = document.getElementById('dashCard');
+  const statusPill = document.getElementById('status');
+  const confirmEl = document.getElementById('confirm');
+  const form = document.getElementById('gform');
+  const clearBtn = document.getElementById('clearBtn');
+
+  // Submit to Google Form in a hidden iframe (avoids CORS, keeps page on GitHub)
+  form.addEventListener('submit', () => {
+    statusPill.textContent = 'Submitting…';
+    confirmEl.classList.add('hidden');
+    // The iframe will load after Google receives the response; show confirmation then.
+    const iframe = document.getElementById('hidden_iframe');
+    const onLoad = () => {
+      statusPill.textContent = 'Submitted';
+      confirmEl.classList.remove('hidden');
+      iframe.removeEventListener('load', onLoad);
+    };
+    iframe.addEventListener('load', onLoad);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    form.reset();
+    confirmEl.classList.add('hidden');
+    statusPill.textContent = 'Ready';
+  });
+
+  navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
+  navDash.addEventListener('click', () => { logCard.classList.add('hidden'); dashCard.classList.remove('hidden'); loadDashboard(); });
+
+  function tint(v) {
+    if (v === null) return '';
+    if (v < 1.5) return 'background:#2b0b0b; color:#ef4444;';
+    if (v < 2.5) return 'background:#3a2500; color:#f59e0b;';
+    return 'background:#052814; color:#22c55e;';
+  }
+
+  async function loadDashboard() {
+    statusPill.textContent = 'Loading…';
+    const res = await fetch(CSV_URL);
+    const csv = await res.text();
+    // Simple CSV parse
+    const rows = csv.split(/\r?\n/).map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+    if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
+
+    const head = rows[0];
+    const data = rows.slice(1).filter(r => r.length === head.length);
+
+    // Column indexes
+    const iStudent = head.indexOf('Student');
+    const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
+    const iCats = cats.map(c => head.indexOf(c));
+
+    // Group by student
+    const map = new Map();
+    for (const r of data) {
+      const name = r[iStudent];
+      if (!name) continue;
+      if (!map.has(name)) map.set(name, { sums:Array(5).fill(0), counts:Array(5).fill(0) });
+      const rec = map.get(name);
+      iCats.forEach((idx, i) => {
+        const v = Number(r[idx]);
+        if (!isNaN(v)) { rec.sums[i] += v; rec.counts[i] += 1; }
+      });
+    }
+
+    const rowsAgg = [...map.entries()].map(([student, rec]) => {
+      const avgs = rec.sums.map((s, i) => rec.counts[i] ? s/rec.counts[i] : null);
+      const nums = avgs.filter(x => x !== null);
+      const overall = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
+      return { student, avgs, overall };
+    }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
+
+    // Render table
+    const thead = document.getElementById('thead');
+    const tbody = document.getElementById('tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    const ths = ['Student', ...cats, 'Overall'];
+    ths.forEach(h => { const th = document.createElement('th'); th.textContent = h; thead.appendChild(th); });
+
+    rowsAgg.forEach(r => {
+      const tr = document.createElement('tr');
+      function td(txt, style='') { const td=document.createElement('td'); td.textContent=txt; if(style) td.style=style; tr.appendChild(td); }
+      td(r.student);
+      r.avgs.forEach(v => td(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
+      td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2), 'font-weight:700; ' + tint(r.overall));
+      tbody.appendChild(tr);
+    });
+
+    statusPill.textContent = 'Ready';
+  }
+</script>
+</body>
+</html>
