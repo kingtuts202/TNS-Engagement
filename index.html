@@ -53,18 +53,27 @@
           <label for="student">Student</label>
           <select id="student" name="entry.600087882" required>
             <option value="" selected>—</option>
-            <option>Tony</option>
-            <option>Cameron</option>
-            <option>Sela</option>
-            <option>Miles</option>
-            <option>Juni</option>
-            <option>Lucy</option>
-            <option>Kaden</option>
-            <option>Quinn</option>
-            <option>Micah</option>
-            <option>Lia</option>
-            <option>Phoenix</option>
-            <option>Uriah</option>
+            <option>Tony</option><option>Cameron</option><option>Sela</option>
+            <option>Miles</option><option>Juni</option><option>Lucy</option>
+            <option>Kaden</option><option>Quinn</option><option>Micah</option>
+            <option>Lia</option><option>Phoenix</option><option>Uriah</option>
+          </select>
+        </div>
+
+        <!-- Class -->
+        <div>
+          <label for="class">Class</label>
+          <!-- entry.740434656 from your prefill -->
+          <select id="class" name="entry.740434656" required>
+            <option value="" selected>—</option>
+            <!-- include your example class plus some common placeholders; edit as needed -->
+            <option>Wilde Lore and Living Earth</option>
+            <option>Humanities</option>
+            <option>STEM</option>
+            <option>Advisory</option>
+            <option>Art</option>
+            <option>Music</option>
+            <option>PE</option>
           </select>
         </div>
 
@@ -96,6 +105,12 @@
         <div>
           <label>Reflection/Growth (0–3)</label>
           <select name="entry.476397369"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
+        </div>
+
+        <!-- Notes -->
+        <div style="grid-column: 1 / -1;">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" name="entry.155155169" placeholder="E.g., led the discussion; needs reminder on materials"></textarea>
         </div>
       </div>
 
@@ -217,7 +232,7 @@
       const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
 
       // Required columns
-      const iStudent = findHeader(head, ['Student', 'Student Name']);
+      const iStudent = findHeader(head, ['Student','Student Name']);
       const iClass = findHeader(head, ['Class']);
       requireIndex(iStudent, 'Student');
       requireIndex(iClass, 'Class');
@@ -233,17 +248,16 @@
       const iCats = cats.map(c => findHeader(head, catAliases[c]));
       iCats.forEach((idx, k) => requireIndex(idx, cats[k]));
 
-      // Populate Class filter
+      // Populate Class filter from data
       const classes = [...new Set(data.map(r => r[iClass]).filter(Boolean))].sort();
       classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
 
-      // Filter by selected class
+      // Apply filter
       const classSel = classFilter.value;
       const filtered = classSel ? data.filter(r => r[iClass] === classSel) : data;
 
-      // Aggregate by student
+      // Aggregate by student + class sums
       const byStudent = new Map();
-      // Also collect class-level sums for the footer
       const classSums = Array(iCats.length).fill(0);
       const classCounts = Array(iCats.length).fill(0);
 
@@ -272,7 +286,7 @@
         return { student, avgs, overall };
       }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
 
-      // Compute Class Average row
+      // Class Average row
       const classAvgs = classSums.map((s, i) => classCounts[i] ? s / classCounts[i] : null);
       const classNums = classAvgs.filter(x => x !== null);
       const classOverall = classNums.length ? classNums.reduce((a,b)=>a+b,0)/classNums.length : null;
