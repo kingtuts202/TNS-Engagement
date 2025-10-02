@@ -25,6 +25,7 @@
   th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
   .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
+  .warn { color:#f59e0b; font-size:12px; margin-top:6px; }
 
   /* Responsive tweaks */
   @media (max-width: 600px) {
@@ -76,19 +77,14 @@
           </select>
         </div>
 
-        <!-- Class -->
+        <!-- Class (LIVE from sheet) -->
         <div>
           <label for="class">Class</label>
           <select id="class" name="entry.740434656" required>
             <option value="" selected>—</option>
-            <option>Wilde Lore and Living Earth</option>
-            <option>Humanities</option>
-            <option>STEM</option>
-            <option>Advisory</option>
-            <option>Art</option>
-            <option>Music</option>
-            <option>PE</option>
+            <!-- Options are injected from the sheet; no placeholders -->
           </select>
+          <div id="classWarn" class="warn hidden">Couldn’t load class list — please reload.</div>
         </div>
 
         <!-- Preparedness -->
@@ -144,7 +140,7 @@
     <h1>Dashboard</h1>
     <p class="muted">Colors: green ≥ 2.5, yellow 1.5–2.49, red &lt; 1.5</p>
 
-    <!-- Class filter -->
+    <!-- Class filter (LIVE from sheet) -->
     <div style="margin-bottom:12px;">
       <label for="classFilter">Filter by Class:</label>
       <select id="classFilter">
@@ -173,7 +169,7 @@
   const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
 
   // Fallback to your published CSV
-  const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
+  const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv`;
 
   async function fetchCSVText() {
     const sources = [
@@ -212,6 +208,8 @@
   const tfoot = document.getElementById('tfoot');
   const classFilter = document.getElementById('classFilter');
   const refreshBtn = document.getElementById('refreshBtn');
+  const classSelect = document.getElementById('class');
+  const classWarn = document.getElementById('classWarn');
 
   // Submit handler
   form.addEventListener('submit', () => {
@@ -223,6 +221,8 @@
       confirmEl.classList.remove('hidden');
       iframe.removeEventListener('load', onLoad);
       form.reset();
+      // repopulate class dropdown after reset
+      populateClassesFromSheet().catch(()=>{});
     };
     iframe.addEventListener('load', onLoad);
   });
@@ -231,6 +231,7 @@
     form.reset();
     confirmEl.classList.add('hidden');
     statusPill.textContent = 'Ready';
+    populateClassesFromSheet().catch(()=>{});
   });
 
   navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
@@ -259,16 +260,56 @@
     if (idx === -1) throw new Error('Missing column: ' + label);
   }
 
+  function parseCSVToRows(csv) {
+    return csv
+      .split(/\r?\n/)
+      .filter(r => r.trim().length)
+      .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+  }
+
+  function distinctSortedTrimmed(values) {
+    // trim + dedupe case-insensitively while preserving first-cased value
+    const seen = new Map(); // key: lowercased trimmed, val: original first value
+    for (const v of values) {
+      const t = (v || '').trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (!seen.has(k)) seen.set(k, t);
+    }
+    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b));
+  }
+
+  async function populateClassesFromSheet() {
+    try {
+      const csv = await fetchCSVText();
+      const rows = parseCSVToRows(csv);
+      const head = rows[0];
+      const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
+      const iClass = findHeader(head, ['Class']);
+      requireIndex(iClass, 'Class');
+
+      const classes = distinctSortedTrimmed(data.map(r => r[iClass]));
+      // Update Form class dropdown
+      const current = classSelect.value;
+      classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
+      // try to preserve selection if still present
+      if (classes.includes(current)) classSelect.value = current;
+
+      // Update Dashboard filter too
+      classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
+      classWarn.classList.add('hidden');
+    } catch (e) {
+      console.warn('populateClassesFromSheet() failed:', e);
+      classWarn.classList.remove('hidden');
+    }
+  }
+
   async function loadDashboard() {
     try {
       statusPill.textContent = 'Loading…';
 
       const csv = await fetchCSVText();
-
-      const rows = csv
-        .split(/\r?\n/)
-        .filter(r => r.trim().length)
-        .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+      const rows = parseCSVToRows(csv);
 
       if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
 
@@ -292,13 +333,15 @@
       const iCats = cats.map(c => findHeader(head, catAliases[c]));
       iCats.forEach((idx, k) => requireIndex(idx, cats[k]));
 
-      // Populate Class filter from data
-      const classes = [...new Set(data.map(r => r[iClass]).filter(Boolean))].sort();
+      // Keep form/dashboard class options synced with live values
+      const classes = distinctSortedTrimmed(data.map(r => r[iClass]));
       classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
+      // If user had a selected filter that no longer exists, reset it
+      if (classFilter.value && !classes.includes(classFilter.value)) classFilter.value = '';
 
       // Apply filter
       const classSel = classFilter.value;
-      const filtered = classSel ? data.filter(r => r[iClass] === classSel) : data;
+      const filtered = classSel ? data.filter(r => (r[iClass] || '').trim() === classSel) : data;
 
       // Aggregate by student + class sums
       const byStudent = new Map();
@@ -373,12 +416,23 @@
       tfoot.appendChild(trF);
 
       statusPill.textContent = 'Ready';
+
+      // Also refresh the form's Class dropdown if needed
+      classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
+      classWarn.classList.add('hidden');
     } catch (e) {
       console.error('Dashboard error:', e);
       statusPill.textContent = 'Error';
       alert('Dashboard error: ' + (e.message || e));
+      // Keep a warning by the class selector if we can't load options
+      classWarn.classList.remove('hidden');
     }
   }
+
+  // Prime the class dropdown from data as soon as page loads
+  (async () => {
+    await populateClassesFromSheet().catch(()=>{});
+  })();
 </script>
 </body>
 </html>
