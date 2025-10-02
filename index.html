@@ -25,6 +25,24 @@
   th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
   .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
+  /* Small screens: tighten font + padding, stack buttons */
+@media (max-width: 600px) {
+  h1 { font-size: 18px; }
+  body { font-size: 14px; }
+  .wrap { padding: 8px; }
+  .card { padding: 12px; }
+  select, textarea { font-size: 14px; padding: 8px; }
+  button { flex: 1; font-size: 14px; padding: 8px; }
+  .actions { flex-direction: column; }
+  table { font-size: 13px; }
+}
+
+/* Medium screens: slight adjustments */
+@media (max-width: 900px) {
+  h1 { font-size: 20px; }
+  .wrap { padding: 12px; }
+}
+
 </style>
 </head>
 <body>
