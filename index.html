@@ -27,7 +27,6 @@
   .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
   .warn { color:#f59e0b; font-size:12px; margin-top:6px; }
 
-  /* Responsive tweaks */
   @media (max-width: 600px) {
     h1 { font-size: 18px; }
     body { font-size: 14px; }
@@ -46,26 +45,22 @@
 </head>
 <body>
 <div class="wrap">
-  <!-- Top Nav -->
   <div class="card" style="margin-bottom:12px; padding:12px 16px; display:flex; gap:8px; align-items:center;">
     <button id="navLog" class="secondary">Log</button>
     <button id="navDash" class="secondary">Dashboard</button>
     <span class="pill" id="status" style="margin-left:auto;">Ready</span>
   </div>
 
-  <!-- Log card -->
+  <!-- Log -->
   <div class="card" id="logCard">
     <h1>Engagement Tracker</h1>
     <p class="muted">Use 0–3 where 3 = consistently engaged.</p>
 
-    <!-- Hidden iframe to avoid navigating away on submit -->
     <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
 
-    <!-- Posts directly to your Google Form -->
     <form id="gform" method="POST" target="hidden_iframe"
       action="https://docs.google.com/forms/d/e/1FAIpQLScQKrGvj614QZdjZBDBMdoPHR2hJT15fNJwBekfvdWUaiX8jA/formResponse">
       <div class="grid">
-        <!-- Student -->
         <div>
           <label for="student">Student</label>
           <select id="student" name="entry.600087882" required>
@@ -77,47 +72,36 @@
           </select>
         </div>
 
-        <!-- Class (LIVE from sheet) -->
+        <!-- Class (now populated from sheet / fallbacks) -->
         <div>
           <label for="class">Class</label>
           <select id="class" name="entry.740434656" required>
             <option value="" selected>—</option>
-            <!-- Options are injected from the sheet; no placeholders -->
           </select>
-          <div id="classWarn" class="warn hidden">Couldn’t load class list — please reload.</div>
+          <div id="classWarn" class="warn hidden">Couldn’t load class list — using fallback.</div>
         </div>
 
-        <!-- Preparedness -->
         <div>
           <label>Preparedness (0–3)</label>
           <select name="entry.1686702304"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
-
-        <!-- Participation -->
         <div>
           <label>Participation (0–3)</label>
           <select name="entry.1636498973"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
-
-        <!-- Work Completion -->
         <div>
           <label>Work Completion (0–3)</label>
           <select name="entry.1072802712"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
-
-        <!-- Collaboration -->
         <div>
           <label>Collaboration (0–3)</label>
           <select name="entry.1339133543"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
-
-        <!-- Reflection/Growth -->
         <div>
           <label>Reflection/Growth (0–3)</label>
           <select name="entry.476397369"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
 
-        <!-- Notes -->
         <div style="grid-column: 1 / -1;">
           <label for="notes">Notes (optional)</label>
           <textarea id="notes" name="entry.155155169" placeholder="E.g., led the discussion; needs reminder on materials"></textarea>
@@ -135,12 +119,11 @@
     </div>
   </div>
 
-  <!-- Dashboard card -->
+  <!-- Dashboard -->
   <div class="card hidden" id="dashCard">
     <h1>Dashboard</h1>
     <p class="muted">Colors: green ≥ 2.5, yellow 1.5–2.49, red &lt; 1.5</p>
 
-    <!-- Class filter (LIVE from sheet) -->
     <div style="margin-bottom:12px;">
       <label for="classFilter">Filter by Class:</label>
       <select id="classFilter">
@@ -162,92 +145,50 @@
 </div>
 
 <script>
-  // ---- DASHBOARD DATA SOURCE ----
-  // Preferred GViz endpoint (stable for embedding)
+  // === DATA ENDPOINTS ===
+  // Preferred (GViz)
   const SHEET_ID = "1mTF8cLllg818vc9A8qJ51UqHucreV1ZQl6OYK9tdkP0";
-  const GID = "825728935";
-  const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+  const RESPONSES_GID = "825728935";  // Form Responses tab
+  const CLASSES_SHEET = "Classes";    // Optional tab with a single column "Class"
 
-  // Fallback to your published CSV
-  const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv`;
+  const GVIZ_RESPONSES = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${RESPONSES_GID}`;
+  const GVIZ_CLASSES   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CLASSES_SHEET)}`;
 
-  async function fetchCSVText() {
-    const sources = [
-      { name: "GViz", url: GVIZ_URL },
-      { name: "Published CSV", url: PUB_URL },
-    ];
+  // Fallback (Publish-to-web CSV)
+  const PUB_RESPONSES = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
+
+  // Final fallback: your five classes (never blank)
+  const DEFAULT_CLASSES = [
+    "Post-Apocalyptic Fiction",
+    "Dollars & Sense: Real-World Math for Life",
+    "Wilde Lore and Living Earth",
+    "Local Haunts",
+    "Wild Wellness: Foraging & Survival Shelter Building"
+  ];
+
+  async function fetchCSV(urls) {
     let lastErr = null;
-    for (const src of sources) {
+    for (const u of urls) {
       try {
-        console.log(`[fetchCSV] Trying ${src.name}: ${src.url}`);
-        const res = await fetch(src.url, { cache: 'no-store', mode: 'cors' });
-        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        const res = await fetch(u, { cache: 'no-store', mode: 'cors' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
-        if (!text || !text.trim()) throw new Error('Empty CSV response');
-        console.log(`[fetchCSV] ${src.name} OK, first 200 chars:`, text.slice(0, 200));
-        statusPill.textContent = `Loaded (${src.name})`;
+        if (!text.trim()) throw new Error('Empty CSV');
         return text;
-      } catch (e) {
-        console.warn(`[fetchCSV] ${src.name} failed:`, e);
-        lastErr = e;
-      }
+      } catch (e) { lastErr = e; }
     }
-    throw lastErr || new Error('All CSV sources failed');
+    throw lastErr || new Error('All sources failed');
   }
 
-  const navLog = document.getElementById('navLog');
-  const navDash = document.getElementById('navDash');
-  const logCard = document.getElementById('logCard');
-  const dashCard = document.getElementById('dashCard');
-  const statusPill = document.getElementById('status');
-  const confirmEl = document.getElementById('confirm');
-  const form = document.getElementById('gform');
-  const clearBtn = document.getElementById('clearBtn');
-  const thead = document.getElementById('thead');
-  const tbody = document.getElementById('tbody');
-  const tfoot = document.getElementById('tfoot');
-  const classFilter = document.getElementById('classFilter');
-  const refreshBtn = document.getElementById('refreshBtn');
-  const classSelect = document.getElementById('class');
-  const classWarn = document.getElementById('classWarn');
-
-  // Submit handler
-  form.addEventListener('submit', () => {
-    statusPill.textContent = 'Submitting…';
-    confirmEl.classList.add('hidden');
-    const iframe = document.getElementById('hidden_iframe');
-    const onLoad = () => {
-      statusPill.textContent = 'Submitted';
-      confirmEl.classList.remove('hidden');
-      iframe.removeEventListener('load', onLoad);
-      form.reset();
-      // repopulate class dropdown after reset
-      populateClassesFromSheet().catch(()=>{});
-    };
-    iframe.addEventListener('load', onLoad);
-  });
-
-  clearBtn.addEventListener('click', () => {
-    form.reset();
-    confirmEl.classList.add('hidden');
-    statusPill.textContent = 'Ready';
-    populateClassesFromSheet().catch(()=>{});
-  });
-
-  navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
-  navDash.addEventListener('click', () => { logCard.classList.add('hidden'); dashCard.classList.remove('hidden'); loadDashboard(); });
-  refreshBtn.addEventListener('click', loadDashboard);
-  classFilter.addEventListener('change', loadDashboard);
-
-  function tint(v) {
-    if (v === null) return '';
-    if (v < 1.5) return 'background:#2b0b0b; color:#ef4444;';
-    if (v < 2.5) return 'background:#3a2500; color:#f59e0b;';
-    return 'background:#052814; color:#22c55e;';
+  function parseCSV(csv) {
+    return csv
+      .split(/\r?\n/)
+      .filter(r => r.trim().length)
+      .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
   }
 
   function findHeader(headers, names) {
-    const norm = h => (h || '').toString().trim().toLowerCase();
+    const norm = s => (s||'').toString().trim().toLowerCase();
     const H = headers.map(norm);
     for (const name of names) {
       const i = H.indexOf(norm(name));
@@ -260,67 +201,91 @@
     if (idx === -1) throw new Error('Missing column: ' + label);
   }
 
-  function parseCSVToRows(csv) {
-    return csv
-      .split(/\r?\n/)
-      .filter(r => r.trim().length)
-      .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
-  }
-
   function distinctSortedTrimmed(values) {
-    // trim + dedupe case-insensitively while preserving first-cased value
-    const seen = new Map(); // key: lowercased trimmed, val: original first value
+    const seen = new Map();
     for (const v of values) {
       const t = (v || '').trim();
       if (!t) continue;
       const k = t.toLowerCase();
       if (!seen.has(k)) seen.set(k, t);
     }
-    return Array.from(seen.values()).sort((a,b)=>a.localeCompare(b));
+    return [...seen.values()].sort((a,b)=>a.localeCompare(b));
   }
 
-  async function populateClassesFromSheet() {
+  // === CLASS LIST POPULATION ===
+  const classSelect = document.getElementById('class');
+  const classFilter = document.getElementById('classFilter');
+  const classWarn = document.getElementById('classWarn');
+
+  async function getClasses() {
+    // 1) Try dedicated "Classes" tab
     try {
-      const csv = await fetchCSVText();
-      const rows = parseCSVToRows(csv);
+      const csv = await fetchCSV([GVIZ_CLASSES]);
+      const rows = parseCSV(csv);
       const head = rows[0];
-      const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
       const iClass = findHeader(head, ['Class']);
       requireIndex(iClass, 'Class');
+      const list = distinctSortedTrimmed(rows.slice(1).map(r => r[iClass]));
+      if (list.length) return list;
+    } catch(_) { /* ignore and fall through */ }
 
-      const classes = distinctSortedTrimmed(data.map(r => r[iClass]));
-      // Update Form class dropdown
-      const current = classSelect.value;
-      classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
-      // try to preserve selection if still present
-      if (classes.includes(current)) classSelect.value = current;
+    // 2) Fall back to responses sheet
+    try {
+      const csv = await fetchCSV([GVIZ_RESPONSES, PUB_RESPONSES]);
+      const rows = parseCSV(csv);
+      const head = rows[0];
+      const iClass = findHeader(head, ['Class']);
+      requireIndex(iClass, 'Class');
+      const list = distinctSortedTrimmed(rows.slice(1).map(r => r[iClass]));
+      if (list.length) return list;
+    } catch(_) { /* ignore and fall through */ }
 
-      // Update Dashboard filter too
-      classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
-      classWarn.classList.add('hidden');
-    } catch (e) {
-      console.warn('populateClassesFromSheet() failed:', e);
-      classWarn.classList.remove('hidden');
-    }
+    // 3) Final fallback
+    return DEFAULT_CLASSES.slice();
+  }
+
+  async function populateClassControls() {
+    const classes = await getClasses();
+    const currentFormSel = classSelect.value;
+    const currentFilterSel = classFilter.value;
+
+    classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
+    classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
+
+    if (classes.includes(currentFormSel)) classSelect.value = currentFormSel;
+    if (currentFilterSel && classes.includes(currentFilterSel)) classFilter.value = currentFilterSel;
+
+    classWarn.classList.toggle('hidden', classes !== DEFAULT_CLASSES);
+  }
+
+  // === DASHBOARD ===
+  const statusPill = document.getElementById('status');
+  const thead = document.getElementById('thead');
+  const tbody = document.getElementById('tbody');
+  const tfoot = document.getElementById('tfoot');
+
+  function tint(v) {
+    if (v === null) return '';
+    if (v < 1.5) return 'background:#2b0b0b; color:#ef4444;';
+    if (v < 2.5) return 'background:#3a2500; color:#f59e0b;';
+    return 'background:#052814; color:#22c55e;';
   }
 
   async function loadDashboard() {
     try {
       statusPill.textContent = 'Loading…';
+      await populateClassControls();
 
-      const csv = await fetchCSVText();
-      const rows = parseCSVToRows(csv);
-
+      const csv = await fetchCSV([GVIZ_RESPONSES, PUB_RESPONSES]);
+      const rows = parseCSV(csv);
       if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
 
       const head = rows[0];
       const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
 
-      // Required columns (case-insensitive)
       const iStudent = findHeader(head, ['Student','Student Name']);
       const iClass = findHeader(head, ['Class']);
-      requireIndex(iStudent, 'Student');
-      requireIndex(iClass, 'Class');
+      requireIndex(iStudent, 'Student'); requireIndex(iClass, 'Class');
 
       const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
       const catAliases = {
@@ -331,108 +296,94 @@
         'Reflection/Growth': ['Reflection/Growth','Reflection / Growth','Reflection- Growth'],
       };
       const iCats = cats.map(c => findHeader(head, catAliases[c]));
-      iCats.forEach((idx, k) => requireIndex(idx, cats[k]));
+      iCats.forEach((idx,k)=>requireIndex(idx,cats[k]));
 
-      // Keep form/dashboard class options synced with live values
-      const classes = distinctSortedTrimmed(data.map(r => r[iClass]));
-      classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
-      // If user had a selected filter that no longer exists, reset it
-      if (classFilter.value && !classes.includes(classFilter.value)) classFilter.value = '';
+      // Filter by class
+      const sel = classFilter.value;
+      const filtered = sel ? data.filter(r => (r[iClass]||'').trim() === sel) : data;
 
-      // Apply filter
-      const classSel = classFilter.value;
-      const filtered = classSel ? data.filter(r => (r[iClass] || '').trim() === classSel) : data;
-
-      // Aggregate by student + class sums
+      // Aggregate
       const byStudent = new Map();
-      const classSums = Array(iCats.length).fill(0);
-      const classCounts = Array(iCats.length).fill(0);
+      const sums = Array(iCats.length).fill(0);
+      const counts = Array(iCats.length).fill(0);
 
       for (const r of filtered) {
-        const name = (r[iStudent] || '').trim();
+        const name = (r[iStudent]||'').trim();
         if (!name) continue;
-
-        if (!byStudent.has(name)) {
-          byStudent.set(name, { sums:Array(iCats.length).fill(0), counts:Array(iCats.length).fill(0) });
-        }
+        if (!byStudent.has(name)) byStudent.set(name, { s:Array(iCats.length).fill(0), c:Array(iCats.length).fill(0) });
         const rec = byStudent.get(name);
-
-        iCats.forEach((col, i) => {
-          const v = Number((r[col] || '').toString().trim());
-          if (!Number.isNaN(v)) {
-            rec.sums[i] += v; rec.counts[i] += 1;
-            classSums[i] += v; classCounts[i] += 1;
-          }
+        iCats.forEach((col,i)=>{
+          const v = Number((r[col]||'').toString().trim());
+          if (!Number.isNaN(v)) { rec.s[i]+=v; rec.c[i]++; sums[i]+=v; counts[i]++; }
         });
       }
 
-      const agg = [...byStudent.entries()].map(([student, rec]) => {
-        const avgs = rec.sums.map((s, i) => rec.counts[i] ? s / rec.counts[i] : null);
-        const nums = avgs.filter(x => x !== null);
-        const overall = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
+      const rowsOut = [...byStudent.entries()].map(([student,rec])=>{
+        const avgs = rec.s.map((s,i)=> rec.c[i] ? s/rec.c[i] : null);
+        const used = avgs.filter(x=>x!==null);
+        const overall = used.length ? used.reduce((a,b)=>a+b,0)/used.length : null;
         return { student, avgs, overall };
-      }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
+      }).sort((a,b)=> (a.overall ?? Infinity) - (b.overall ?? Infinity));
 
-      // Class Average row
-      const classAvgs = classSums.map((s, i) => classCounts[i] ? s / classCounts[i] : null);
-      const classNums = classAvgs.filter(x => x !== null);
-      const classOverall = classNums.length ? classNums.reduce((a,b)=>a+b,0)/classNums.length : null;
+      const classAvgs = sums.map((s,i)=> counts[i] ? s/counts[i] : null);
+      const usedC = classAvgs.filter(x=>x!==null);
+      const classOverall = usedC.length ? usedC.reduce((a,b)=>a+b,0)/usedC.length : null;
 
-      // Render table
-      thead.innerHTML = '';
-      tbody.innerHTML = '';
-      tfoot.innerHTML = '';
+      // Render
+      thead.innerHTML=''; tbody.innerHTML=''; tfoot.innerHTML='';
+      ['Student',...cats,'Overall'].forEach(h=>{ const th=document.createElement('th'); th.textContent=h; thead.appendChild(th); });
 
-      ['Student', ...cats, 'Overall'].forEach(h => {
-        const th = document.createElement('th'); th.textContent = h; thead.appendChild(th);
-      });
-
-      agg.forEach(r => {
-        const tr = document.createElement('tr');
-        function td(txt, style='') {
-          const c = document.createElement('td');
-          c.textContent = txt;
-          if (style) c.style = style;
-          tr.appendChild(c);
-        }
+      rowsOut.forEach(r=>{
+        const tr=document.createElement('tr');
+        function td(t,style=''){ const c=document.createElement('td'); c.textContent=t; if(style) c.style=style; tr.appendChild(c);}
         td(r.student);
-        r.avgs.forEach(v => td(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
-        td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2), 'font-weight:700; ' + tint(r.overall));
+        r.avgs.forEach(v=>td(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
+        td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2),'font-weight:700; '+tint(r.overall));
         tbody.appendChild(tr);
       });
 
-      // Footer: Class Average
-      const trF = document.createElement('tr');
-      function tdf(txt, style='') {
-        const c = document.createElement('td');
-        c.textContent = txt;
-        if (style) c.style = style;
-        trF.appendChild(c);
-      }
-      const label = classSel ? `Class Average (${classSel})` : 'Class Average (All)';
+      const trF=document.createElement('tr');
+      function tdf(t,style=''){ const c=document.createElement('td'); c.textContent=t; if(style) c.style=style; trF.appendChild(c); }
+      const label = sel ? `Class Average (${sel})` : 'Class Average (All)';
       tdf(label);
-      classAvgs.forEach(v => tdf(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
-      tdf(classOverall==null?'—':(Math.round(classOverall*100)/100).toFixed(2), 'font-weight:700; ' + tint(classOverall));
+      classAvgs.forEach(v=>tdf(v==null?'—':(Math.round(v*100)/100).toFixed(2),tint(v)));
+      tdf(classOverall==null?'—':(Math.round(classOverall*100)/100).toFixed(2),'font-weight:700; '+tint(classOverall));
       tfoot.appendChild(trF);
 
-      statusPill.textContent = 'Ready';
-
-      // Also refresh the form's Class dropdown if needed
-      classSelect.innerHTML = '<option value="" selected>—</option>' + classes.map(c => `<option>${c}</option>`).join('');
-      classWarn.classList.add('hidden');
-    } catch (e) {
-      console.error('Dashboard error:', e);
-      statusPill.textContent = 'Error';
+      statusPill.textContent='Ready';
+    } catch(e) {
+      console.error(e);
+      statusPill.textContent='Error';
       alert('Dashboard error: ' + (e.message || e));
-      // Keep a warning by the class selector if we can't load options
-      classWarn.classList.remove('hidden');
     }
   }
 
-  // Prime the class dropdown from data as soon as page loads
-  (async () => {
-    await populateClassesFromSheet().catch(()=>{});
-  })();
+  // === UI WIRING ===
+  const navLog = document.getElementById('navLog');
+  const navDash = document.getElementById('navDash');
+  const logCard = document.getElementById('logCard');
+  const dashCard = document.getElementById('dashCard');
+  const confirmEl = document.getElementById('confirm');
+  const form = document.getElementById('gform');
+  const clearBtn = document.getElementById('clearBtn');
+  const refreshBtn = document.getElementById('refreshBtn');
+
+  form.addEventListener('submit', () => {
+    statusPill.textContent = 'Submitting…'; confirmEl.classList.add('hidden');
+    const iframe = document.getElementById('hidden_iframe');
+    const onLoad = () => { statusPill.textContent = 'Submitted'; confirmEl.classList.remove('hidden'); iframe.removeEventListener('load', onLoad); form.reset(); populateClassControls().catch(()=>{}); };
+    iframe.addEventListener('load', onLoad);
+  });
+
+  clearBtn.addEventListener('click', () => { form.reset(); confirmEl.classList.add('hidden'); statusPill.textContent = 'Ready'; populateClassControls().catch(()=>{}); });
+
+  navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
+  navDash.addEventListener('click', () => { logCard.classList.add('hidden'); dashCard.classList.remove('hidden'); loadDashboard(); });
+  refreshBtn.addEventListener('click', loadDashboard);
+  classFilter.addEventListener('change', loadDashboard);
+
+  // Prime class dropdowns on page load
+  (async () => { await populateClassControls(); })();
 </script>
 </body>
 </html>
