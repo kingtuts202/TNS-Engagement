@@ -8,12 +8,13 @@
 <style>
   :root { --bg:#0b0c10; --card:#111317; --text:#e8e8e8; --muted:#a1a1aa; --accent:#60a5fa; --line:#1f2430; }
   body { margin:0; font-family:Inter,system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  .wrap { max-width: 860px; margin: 24px auto; padding: 16px; }
+  .wrap { max-width: 960px; margin: 24px auto; padding: 16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
   h1 { font-size:22px; margin:0 0 12px; }
   p.muted { color:var(--muted); margin:0 0 16px; }
   label { display:block; font-weight:600; margin:12px 0 6px; }
-  select { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
+  select, textarea { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1217; color:var(--text); }
+  textarea { min-height:88px; resize:vertical; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
   .actions { display:flex; gap:10px; margin-top:16px; }
   button { cursor:pointer; border:1px solid var(--line); background:var(--accent); color:#0b1220; font-weight:700; padding:10px 14px; border-radius:12px; }
@@ -23,6 +24,7 @@
   table { width:100%; border-collapse:collapse; }
   th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
+  .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
 </style>
 </head>
 <body>
@@ -69,41 +71,31 @@
         <!-- Preparedness -->
         <div>
           <label>Preparedness (0–3)</label>
-          <select name="entry.1686702304">
-            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
-          </select>
+          <select name="entry.1686702304"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
 
         <!-- Participation -->
         <div>
           <label>Participation (0–3)</label>
-          <select name="entry.1636498973">
-            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
-          </select>
+          <select name="entry.1636498973"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
 
         <!-- Work Completion -->
         <div>
           <label>Work Completion (0–3)</label>
-          <select name="entry.1072802712">
-            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
-          </select>
+          <select name="entry.1072802712"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
 
         <!-- Collaboration -->
         <div>
           <label>Collaboration (0–3)</label>
-          <select name="entry.1339133543">
-            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
-          </select>
+          <select name="entry.1339133543"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
 
         <!-- Reflection/Growth -->
         <div>
           <label>Reflection/Growth (0–3)</label>
-          <select name="entry.476397369">
-            <option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option>
-          </select>
+          <select name="entry.476397369"><option value=""></option><option>0</option><option>1</option><option>2</option><option>3</option></select>
         </div>
       </div>
 
@@ -122,10 +114,20 @@
   <div class="card hidden" id="dashCard">
     <h1>Dashboard</h1>
     <p class="muted">Colors: green ≥ 2.5, yellow 1.5–2.49, red &lt; 1.5</p>
+
+    <!-- Class filter -->
+    <div style="margin-bottom:12px;">
+      <label for="classFilter">Filter by Class:</label>
+      <select id="classFilter">
+        <option value="">All Classes</option>
+      </select>
+    </div>
+
     <div style="overflow:auto;">
       <table>
         <thead><tr id="thead"></tr></thead>
         <tbody id="tbody"></tbody>
+        <tfoot><tr id="tfoot" class="tfoot-bold"></tr></tfoot>
       </table>
     </div>
     <div class="actions" style="margin-top:16px;">
@@ -148,8 +150,11 @@
   const clearBtn = document.getElementById('clearBtn');
   const thead = document.getElementById('thead');
   const tbody = document.getElementById('tbody');
+  const tfoot = document.getElementById('tfoot');
+  const classFilter = document.getElementById('classFilter');
+  const refreshBtn = document.getElementById('refreshBtn');
 
-  // Submit to Google Form in a hidden iframe (avoids CORS, keeps page on GitHub)
+  // Submit handler
   form.addEventListener('submit', () => {
     statusPill.textContent = 'Submitting…';
     confirmEl.classList.add('hidden');
@@ -171,6 +176,8 @@
 
   navLog.addEventListener('click', () => { dashCard.classList.add('hidden'); logCard.classList.remove('hidden'); });
   navDash.addEventListener('click', () => { logCard.classList.add('hidden'); dashCard.classList.remove('hidden'); loadDashboard(); });
+  refreshBtn.addEventListener('click', loadDashboard);
+  classFilter.addEventListener('change', loadDashboard);
 
   function tint(v) {
     if (v === null) return '';
@@ -179,52 +186,133 @@
     return 'background:#052814; color:#22c55e;';
   }
 
+  function findHeader(headers, names) {
+    const norm = h => (h || '').toString().trim().toLowerCase();
+    const H = headers.map(norm);
+    for (const name of names) {
+      const i = H.indexOf(norm(name));
+      if (i !== -1) return i;
+    }
+    return -1;
+  }
+
+  function requireIndex(idx, label) {
+    if (idx === -1) throw new Error('Missing column: ' + label);
+  }
+
   async function loadDashboard() {
     try {
       statusPill.textContent = 'Loading…';
       const res = await fetch(CSV_URL, { cache: 'no-store' });
       const csv = await res.text();
-      const rows = csv.split(/\r?\n/).map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+
+      const rows = csv
+        .split(/\r?\n/)
+        .filter(r => r.trim().length)
+        .map(r => r.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/));
+
       if (rows.length < 2) { statusPill.textContent = 'No data'; return; }
 
       const head = rows[0];
-      const data = rows.slice(1).filter(r => r.length === head.length && r.some(c => c.trim() !== ''));
+      const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
 
-      const iStudent = head.indexOf('Student');
+      // Required columns
+      const iStudent = findHeader(head, ['Student', 'Student Name']);
+      const iClass = findHeader(head, ['Class']);
+      requireIndex(iStudent, 'Student');
+      requireIndex(iClass, 'Class');
+
       const cats = ['Preparedness','Participation','Work Completion','Collaboration','Reflection/Growth'];
-      const iCats = cats.map(c => head.indexOf(c));
+      const catAliases = {
+        'Preparedness': ['Preparedness'],
+        'Participation': ['Participation'],
+        'Work Completion': ['Work Completion', 'Work completion'],
+        'Collaboration': ['Collaboration'],
+        'Reflection/Growth': ['Reflection/Growth','Reflection / Growth','Reflection- Growth'],
+      };
+      const iCats = cats.map(c => findHeader(head, catAliases[c]));
+      iCats.forEach((idx, k) => requireIndex(idx, cats[k]));
 
-      const map = new Map();
-      for (const r of data) {
-        const name = r[iStudent];
+      // Populate Class filter
+      const classes = [...new Set(data.map(r => r[iClass]).filter(Boolean))].sort();
+      classFilter.innerHTML = '<option value="">All Classes</option>' + classes.map(c => `<option>${c}</option>`).join('');
+
+      // Filter by selected class
+      const classSel = classFilter.value;
+      const filtered = classSel ? data.filter(r => r[iClass] === classSel) : data;
+
+      // Aggregate by student
+      const byStudent = new Map();
+      // Also collect class-level sums for the footer
+      const classSums = Array(iCats.length).fill(0);
+      const classCounts = Array(iCats.length).fill(0);
+
+      for (const r of filtered) {
+        const name = (r[iStudent] || '').trim();
         if (!name) continue;
-        if (!map.has(name)) map.set(name, { sums:Array(cats.length).fill(0), counts:Array(cats.length).fill(0) });
-        const rec = map.get(name);
-        iCats.forEach((idx, i) => {
-          const v = Number(r[idx]);
-          if (!isNaN(v)) { rec.sums[i] += v; rec.counts[i] += 1; }
+
+        if (!byStudent.has(name)) {
+          byStudent.set(name, { sums:Array(iCats.length).fill(0), counts:Array(iCats.length).fill(0) });
+        }
+        const rec = byStudent.get(name);
+
+        iCats.forEach((col, i) => {
+          const v = Number((r[col] || '').toString().trim());
+          if (!Number.isNaN(v)) {
+            rec.sums[i] += v; rec.counts[i] += 1;
+            classSums[i] += v; classCounts[i] += 1;
+          }
         });
       }
 
-      const agg = [...map.entries()].map(([student, rec]) => {
-        const avgs = rec.sums.map((s, i) => rec.counts[i] ? s/rec.counts[i] : null);
+      const agg = [...byStudent.entries()].map(([student, rec]) => {
+        const avgs = rec.sums.map((s, i) => rec.counts[i] ? s / rec.counts[i] : null);
         const nums = avgs.filter(x => x !== null);
         const overall = nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
         return { student, avgs, overall };
       }).sort((a,b) => (a.overall ?? Infinity) - (b.overall ?? Infinity));
 
-      thead.innerHTML = ''; tbody.innerHTML = '';
+      // Compute Class Average row
+      const classAvgs = classSums.map((s, i) => classCounts[i] ? s / classCounts[i] : null);
+      const classNums = classAvgs.filter(x => x !== null);
+      const classOverall = classNums.length ? classNums.reduce((a,b)=>a+b,0)/classNums.length : null;
+
+      // Render table
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      tfoot.innerHTML = '';
+
       ['Student', ...cats, 'Overall'].forEach(h => {
         const th = document.createElement('th'); th.textContent = h; thead.appendChild(th);
       });
+
       agg.forEach(r => {
         const tr = document.createElement('tr');
-        function td(txt, style='') { const c=document.createElement('td'); c.textContent=txt; if(style) c.style=style; tr.appendChild(c); }
+        function td(txt, style='') {
+          const c = document.createElement('td');
+          c.textContent = txt;
+          if (style) c.style = style;
+          tr.appendChild(c);
+        }
         td(r.student);
         r.avgs.forEach(v => td(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
         td(r.overall==null?'—':(Math.round(r.overall*100)/100).toFixed(2), 'font-weight:700; ' + tint(r.overall));
         tbody.appendChild(tr);
       });
+
+      // Footer: Class Average
+      const trF = document.createElement('tr');
+      function tdf(txt, style='') {
+        const c = document.createElement('td');
+        c.textContent = txt;
+        if (style) c.style = style;
+        trF.appendChild(c);
+      }
+      const label = classSel ? `Class Average (${classSel})` : 'Class Average (All)';
+      tdf(label);
+      classAvgs.forEach(v => tdf(v==null?'—':(Math.round(v*100)/100).toFixed(2), tint(v)));
+      tdf(classOverall==null?'—':(Math.round(classOverall*100)/100).toFixed(2), 'font-weight:700; ' + tint(classOverall));
+      tfoot.appendChild(trF);
 
       statusPill.textContent = 'Ready';
     } catch (e) {
