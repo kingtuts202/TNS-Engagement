@@ -25,24 +25,22 @@
   th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   .badge { border-radius:8px; padding:4px 8px; display:inline-block; }
   .tfoot-bold td { font-weight:700; border-top:2px solid var(--line); }
-  /* Small screens: tighten font + padding, stack buttons */
-@media (max-width: 600px) {
-  h1 { font-size: 18px; }
-  body { font-size: 14px; }
-  .wrap { padding: 8px; }
-  .card { padding: 12px; }
-  select, textarea { font-size: 14px; padding: 8px; }
-  button { flex: 1; font-size: 14px; padding: 8px; }
-  .actions { flex-direction: column; }
-  table { font-size: 13px; }
-}
 
-/* Medium screens: slight adjustments */
-@media (max-width: 900px) {
-  h1 { font-size: 20px; }
-  .wrap { padding: 12px; }
-}
-
+  /* Responsive tweaks */
+  @media (max-width: 600px) {
+    h1 { font-size: 18px; }
+    body { font-size: 14px; }
+    .wrap { padding: 8px; }
+    .card { padding: 12px; }
+    select, textarea { font-size: 14px; padding: 8px; }
+    button { flex: 1; font-size: 14px; padding: 8px; }
+    .actions { flex-direction: column; }
+    table { font-size: 13px; }
+  }
+  @media (max-width: 900px) {
+    h1 { font-size: 20px; }
+    .wrap { padding: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -81,10 +79,8 @@
         <!-- Class -->
         <div>
           <label for="class">Class</label>
-          <!-- entry.740434656 from your prefill -->
           <select id="class" name="entry.740434656" required>
             <option value="" selected>—</option>
-            <!-- include your example class plus some common placeholders; edit as needed -->
             <option>Wilde Lore and Living Earth</option>
             <option>Humanities</option>
             <option>STEM</option>
@@ -170,8 +166,38 @@
 </div>
 
 <script>
-  // Your published CSV (dashboard data)
-  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
+  // ---- DASHBOARD DATA SOURCE ----
+  // Preferred GViz endpoint (stable for embedding)
+  const SHEET_ID = "1mTF8cLllg818vc9A8qJ51UqHucreV1ZQl6OYK9tdkP0";
+  const GID = "825728935";
+  const GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${GID}`;
+
+  // Fallback to your published CSV
+  const PUB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRU-MQprepvmDGEvjNqdc7oxx7ojpJrVUtqljBnUT1m0S8dJL9tsvJ1k_sxt1cZw4G1baY3gSCebTZU/pub?output=csv";
+
+  async function fetchCSVText() {
+    const sources = [
+      { name: "GViz", url: GVIZ_URL },
+      { name: "Published CSV", url: PUB_URL },
+    ];
+    let lastErr = null;
+    for (const src of sources) {
+      try {
+        console.log(`[fetchCSV] Trying ${src.name}: ${src.url}`);
+        const res = await fetch(src.url, { cache: 'no-store', mode: 'cors' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        const text = await res.text();
+        if (!text || !text.trim()) throw new Error('Empty CSV response');
+        console.log(`[fetchCSV] ${src.name} OK, first 200 chars:`, text.slice(0, 200));
+        statusPill.textContent = `Loaded (${src.name})`;
+        return text;
+      } catch (e) {
+        console.warn(`[fetchCSV] ${src.name} failed:`, e);
+        lastErr = e;
+      }
+    }
+    throw lastErr || new Error('All CSV sources failed');
+  }
 
   const navLog = document.getElementById('navLog');
   const navDash = document.getElementById('navDash');
@@ -236,8 +262,8 @@
   async function loadDashboard() {
     try {
       statusPill.textContent = 'Loading…';
-      const res = await fetch(CSV_URL, { cache: 'no-store' });
-      const csv = await res.text();
+
+      const csv = await fetchCSVText();
 
       const rows = csv
         .split(/\r?\n/)
@@ -249,7 +275,7 @@
       const head = rows[0];
       const data = rows.slice(1).filter(r => r.some(c => (c || '').trim() !== ''));
 
-      // Required columns
+      // Required columns (case-insensitive)
       const iStudent = findHeader(head, ['Student','Student Name']);
       const iClass = findHeader(head, ['Class']);
       requireIndex(iStudent, 'Student');
@@ -259,7 +285,7 @@
       const catAliases = {
         'Preparedness': ['Preparedness'],
         'Participation': ['Participation'],
-        'Work Completion': ['Work Completion', 'Work completion'],
+        'Work Completion': ['Work Completion','Work completion'],
         'Collaboration': ['Collaboration'],
         'Reflection/Growth': ['Reflection/Growth','Reflection / Growth','Reflection- Growth'],
       };
@@ -348,6 +374,7 @@
 
       statusPill.textContent = 'Ready';
     } catch (e) {
+      console.error('Dashboard error:', e);
       statusPill.textContent = 'Error';
       alert('Dashboard error: ' + (e.message || e));
     }
